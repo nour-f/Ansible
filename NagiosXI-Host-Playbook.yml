@@ -1,0 +1,54 @@
+--- # Installing the Linux monitoring agent For Nagios XI on target RHEL, CentOS,Fedora, SLES, OpenSUSE, Ubuntu, and Debian Linux servers
+- hosts: 127.0.0.1
+  connection: local
+  # connection: ssh
+  become: true
+  gather_facts: no
+  tasks:
+    - lineinfile:
+        path: /etc/ansible/hosts
+        insertbefore: BOF
+        line: '[monitored_hosts_group]'
+    - pause:
+        prompt: "Please make sure you have added all servers you wish to monitor from Nagios XI the file * /etc/ansible/hosts *   under the group monitored_hosts_group \n Press enter to continue"      
+
+
+- hosts: monitored_hosts_group
+ # connection: local
+  connection: ssh
+  become: true
+  vars_prompt:
+    - name: SERVER
+      prompt: "Please provide the ip address of your monitoring server on which you would like to affect guests later  , press enter to continue "
+      private: no
+  gather_facts: yes
+  tasks:   
+    - name:  verify the pexpect package for Debian 
+      command:  apt-get -y install python-pip
+      when: ansible_distribution == 'Debian' or ansible_distribution == 'Ubuntu'
+    - name:  verify the pexpect package for Redhat
+      command: yum install python-pip -y
+      when: ansible_distribution == 'CentOS' or ansible_distribution == 'Red Hat Enterprise Linux'
+    - pip:
+        name: pexpect
+        version: 4.2 
+    - name: Downloading the Linux NRPE
+      get_url:
+        url: https://assets.nagios.com/downloads/nagiosxi/agents/linux-nrpe-agent.tar.gz
+        dest : /tmp
+    - name: Unarchiving downloaded files 
+      unarchive:
+        src: /tmp/linux-nrpe-agent.tar.gz
+        dest: /tmp
+        remote_src: yes
+    - command: sudo touch /tmp/linux-nrpe-agent/installed.firewall
+    - name: Setting up Linux NRPE agent
+      expect: 
+        command: /tmp/linux-nrpe-agent/fullinstall  
+        responses:
+          'continue': 'y'
+          'Allow from': '{{SERVER}}'
+        echo: yes
+        chdir: /tmp/linux-nrpe-agent 
+        timeout: 350
+    - debug: msg=" Configuration Complete , The Monitoring Server may now add your server as a new host from the monitoring server web interface "

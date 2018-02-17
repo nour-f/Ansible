@@ -1,0 +1,110 @@
+--- # Nagios XI Monitoring Server downtime and notifications playbook
+
+- hosts: 127.0.0.1
+  become: true
+  gather_facts: no
+  vars_prompt:
+    - name: ACTION  
+      prompt: "\n Please enter one of the following actions to perform on hosts or on services \n\n downtime \n delete_downtime \n enable_alerts \n disable_alerts \n silence \n unsilence \n silence_nagios \n unsilence_nagios \n command \n servicegroup_service_downtime  \n servicegroup_host_downtime \n "
+      private: no
+    - name: COMMENT  
+      prompt: "\n Would you like to add a comment ? "
+      private: no
+    - name: MINUTES  
+      prompt: "\n If you are scheduling downtime , for how many mintues ? (skip for none) "
+      private: no
+    - name: SERVICEGROUP 
+      prompt: "\n Please provide a service group in case you would like to run the tasks servicegroup_host_downtime or servicegroup_service_downtime (skip for none) "
+      private: no
+    - name: SERVICES  
+      prompt: "\n Please provide one or more services (seperated by a comma) or write all , in case you would like to handle services rather than hosts (Required option when using the downtime, enable_alerts, and disable_alerts actions , you may skip otherwise ) "
+      private: no
+    - name: COMMAND  
+      prompt: "\n Would you like to execute a Nagios Predefined command ? (skip for none)  "
+      private: no
+      
+  tasks:
+    - lineinfile:
+        path: /etc/ansible/hosts
+        insertbefore: BOF
+        line: '[task_group]'
+    - pause:
+        prompt: "Please check the * /etc/ansible/hosts * and add hosts to the group task_group to be able to perform  actions at a time on each of hosts \n Press enter to continue  "      
+
+    - name:  Schedule Downtime
+      delegate_to: task_group
+      nagios: 
+        action: downtime
+        minutes: "{{MINUTES}}"
+        service: "{{SERVICES}}"
+        comment: "{{COMMENT}}"
+      when: ACTION == "downtime"
+
+    - name:  delete_downtime
+      delegate_to: task_group
+      nagios: 
+        action: delete_downtime
+        service: "{{SERVICES}}"
+      when: ACTION  == "delete_downtime"
+
+    - name:  enable_alerts
+      delegate_to: task_group
+      nagios:  
+        action: enable_alerts
+        service:  "{{SERVICES}}"
+      when: ACTION  == "enable_alerts"
+
+    - name:  disable_alerts
+      delegate_to: task_group
+      nagios:  
+        action: disable_alerts
+        service:  "{{SERVICES}}"
+      when: ACTION  == "disable_alerts"
+
+    - name:  silence all alerts
+      delegate_to: task_group
+      nagios:  
+        action: silence
+      when: ACTION  == "silence"
+
+    - name:  unsilence all alerts
+      delegate_to: task_group
+      nagios:  
+        action: unsilence
+      when: ACTION  == "unsilence"
+
+    - name:  silence_nagios
+      delegate_to: task_group
+      nagios: 
+        action: silence_nagios 
+      when: ACTION  == "silence_nagios"
+
+    - name:  unsilence_nagios
+      delegate_to: task_group
+      nagios:  
+        action: unsilence_nagios
+      when: ACTION  == "unsilence_nagios"
+
+    - name:  Executing Command
+      delegate_to: task_group
+      nagios:  
+        action: command
+        command: "{{COMMAND}}"
+      when: 
+         - ACTION  == "command"
+         - COMMAND != ""
+
+    - name:  servicegroup_service_downtime
+      delegate_to: task_group
+      nagios:  
+        minutes: "{{MINUTES}}"
+        servicegroup: "{{SERVICEGROUP}}"
+      when: ACTION  == "servicegroup_service_downtime"
+
+    - name: Downtime for all host in servicegroup
+      delegate_to: task_group
+      nagios:  
+        action: servicegroup_host_downtime
+        minutes: "{{MINUTES}}"
+        servicegroup: "{{SERVICEGROUP}}"
+      when: ACTION  == "servicegroup_host_downtime"

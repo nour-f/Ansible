@@ -1,0 +1,73 @@
+--- # Nagios XI Monitoring Server Installation and Configuration Playbook
+
+- hosts: 127.0.0.1
+  become: true
+  connection: local
+  # connection: ssh
+  gather_facts: no
+  
+  tasks:
+    - lineinfile:
+        path: /etc/ansible/hosts
+        insertbefore: BOF
+        line: '[target_hosts_group]'
+    - pause:
+        prompt: "Please make sure you have added all the hosts on which you wish to install Nagios XI Monitoring Server in the file * /etc/ansible/hosts *   under the group target_hosts_group , press enter to continue "      
+
+- hosts: target_hosts_group
+ # become: true
+ # connection: local
+  connection: ssh
+  gather_facts: yes
+  vars:
+    DIR: nagiosxi
+    DLDIR: nagiosxi
+    FILE: xi-latest.tar.gz
+   
+  tasks:
+    - name:  verify the wget package for Debian 
+      apt:
+        name: wget
+        state: installed
+      when: ansible_distribution == 'Debian' or ansible_distribution == 'Ubuntu'
+    - name:  verify the wget package for Redhat
+      yum: 
+        name: wget
+        state: installed
+      when: ansible_distribution == 'CentOS' or ansible_distribution == 'Red Hat Enterprise Linux'
+    - name: Preparing to download Nagios Binaries 
+      stat:
+        path: /tmp/nagiosxi
+      register: old_nagios_folder
+    - debug: msg='removing existing old directory' 
+    - file:
+        state: absent
+        path: /tmp/nagiosxi
+      when: old_nagios_folder.stat.isdir is defined and old_nagios_folder.stat.isdir
+    - name: Downloading Nagios Binaries 
+      get_url:
+        url: http://assets.nagios.com/downloads/nagiosxi/xi-latest.tar.gz
+        dest : /tmp
+    - name: Unarchiving downloaded files 
+      unarchive:
+        src: /tmp/xi-latest.tar.gz
+        dest: /tmp
+        remote_src: yes
+    - name: Changing access rights for necessary files
+      file: 
+         path:  /tmp/nagiosxi/fullinstall 
+         state: file 
+         mode: a+x
+    - name: Setting up Nagios XI server on hosts
+      shell: yes '' | sudo /tmp/nagiosxi/fullinstall 
+      args:
+         chdir: /tmp/nagiosxi 
+    - debug: msg='Nagios XI installed successfully . You may now access your dashboard via your web browser on localhost/nagiosxi ' 
+    
+  #     notify: Restart Nagios
+  #   - lineinfile: create=yes regexp="NONEXISTENTLINE" dest=/tmp/"{{FILE}}" line="{{logdata.stdout}}" state=present
+  # handlers:
+  #   - name: Restart Nagios
+  #     action: service name=nagios state=restarted
+       
+
